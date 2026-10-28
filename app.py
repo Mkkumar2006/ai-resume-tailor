@@ -11,7 +11,7 @@ import os
 import streamlit as st
 from dotenv import load_dotenv
 from pdf_extractor import extract_text_from_pdf, word_count
-from llm_analyzer import analyze_resume
+from llm_analyzer import analyze_resume, generate_tailored_resume
 
 # ── Env & page config ─────────────────────────────────────────────────────────
 load_dotenv()
@@ -617,10 +617,21 @@ def main() -> None:
         with st.spinner("Analyzing keyword overlap, qualification match, and crafting suggestions..."):
             try:
                 results = analyze_resume(resume_text, job_description)
+                st.session_state["results"] = results
+                st.session_state["resume_text"] = resume_text
+                st.session_state["job_description"] = job_description
+                # Reset previous tailored resume on new analysis
+                if "tailored_resume_text" in st.session_state:
+                    del st.session_state["tailored_resume_text"]
             except Exception as e:
                 st.error(f"Analysis Error: {e}")
                 st.stop()
 
+    # ── Display Results (when available in session) ───────────────────────────
+    if "results" in st.session_state:
+        results = st.session_state["results"]
+        resume_text = st.session_state["resume_text"]
+        job_description = st.session_state["job_description"]
         resume_wc = word_count(resume_text)
         jd_wc = word_count(job_description)
         missing = results.get("missing_keywords", [])
@@ -641,9 +652,10 @@ def main() -> None:
             )
 
         # ── Tabbed Interface ──────────────────────────────────────────────────
-        tab1, tab2, tab3, tab4 = st.tabs([
+        tab1, tab2, tab3, tab4, tab5 = st.tabs([
             "ATS Score & Overview",
-            "Tailored Content",
+            "One-Click Tailored Resume",
+            "Tailored Snippets",
             "Action Checklist",
             "Raw Data & Insights"
         ])
@@ -696,6 +708,64 @@ def main() -> None:
                 st.markdown('</div>', unsafe_allow_html=True)
 
         with tab2:
+            st.markdown("### One-Click Complete Tailored Resume")
+            st.caption(
+                "Applies all missing keywords, inserts the tailored summary, and upgrades your bullet points "
+                "into quantified achievement statements while preserving your real contact info, companies, and dates."
+            )
+
+            c_btn1, c_btn2 = st.columns([1.5, 2.5])
+            with c_btn1:
+                generate_tailored_clicked = st.button("Generate Complete Tailored Resume", use_container_width=True)
+
+            if generate_tailored_clicked or ("tailored_resume_text" in st.session_state and st.session_state["tailored_resume_text"]):
+                if generate_tailored_clicked or "tailored_resume_text" not in st.session_state:
+                    with st.spinner("AI is rewriting and tailoring your complete resume for this job..."):
+                        try:
+                            tailored_text = generate_tailored_resume(resume_text, job_description, missing)
+                            st.session_state["tailored_resume_text"] = tailored_text
+                        except Exception as e:
+                            st.error(f"Error tailoring resume: {e}")
+                            st.stop()
+
+                tailored_content = st.session_state.get("tailored_resume_text", "")
+
+                action_col1, action_col2 = st.columns([1, 1])
+                with action_col1:
+                    st.download_button(
+                        label="Download Tailored Resume (.md / .txt)",
+                        data=tailored_content,
+                        file_name="Tailored_Resume.md",
+                        mime="text/markdown",
+                        use_container_width=True,
+                    )
+                with action_col2:
+                    st.caption("You can edit the text directly in the box below before copying or downloading.")
+
+                edited_text = st.text_area(
+                    label="Editable Tailored Resume Text",
+                    value=tailored_content,
+                    height=460,
+                    key="editable_tailored_resume_area"
+                )
+                st.session_state["tailored_resume_text"] = edited_text
+
+                with st.expander("Copyable Text (1-Click)", expanded=False):
+                    st.code(edited_text, language="markdown")
+            else:
+                st.markdown("""
+                <div style="background:rgba(99, 102, 241, 0.08); border:1px solid rgba(99, 102, 241, 0.25); border-radius:12px; padding:1.5rem; margin-top:1rem;">
+                    <p style="font-size:0.95rem; color:#cbd5e1; font-weight:600; margin-bottom:0.4rem;">
+                        Ready to generate your tailored resume
+                    </p>
+                    <p style="font-size:0.86rem; color:#94a3b8; line-height:1.6; margin:0;">
+                        Click <strong>Generate Complete Tailored Resume</strong> above to automatically rewrite your resume,
+                        weave in the missing keywords, and produce a submission-ready draft you can edit and download.
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
+
+        with tab3:
             st.markdown("### Tailored Professional Summary")
             st.caption("Place this calibrated summary directly beneath your resume header:")
             st.markdown(f'<div class="content-box">"{results["profile_summary"]}"</div>', unsafe_allow_html=True)
@@ -708,7 +778,7 @@ def main() -> None:
             for b in results.get("bullet_point_suggestions", []):
                 st.markdown(f'<div class="bullet-card">▸ &nbsp;{b}</div>', unsafe_allow_html=True)
 
-        with tab3:
+        with tab4:
             st.markdown("### Step-by-Step Optimization Roadmap")
             st.caption("Follow these prioritized steps to elevate your resume compatibility:")
 
@@ -722,7 +792,7 @@ def main() -> None:
             <div class="checklist-item">
                 <span class="step-num">02</span>
                 <div>
-                    <strong>Adopt the Tailored Summary:</strong> Replace generic objective statements with the role-calibrated summary provided in the Tailored Content tab.
+                    <strong>Adopt the Tailored Summary:</strong> Replace generic objective statements with the role-calibrated summary provided in the Tailored Snippets tab.
                 </div>
             </div>
             <div class="checklist-item">
@@ -739,7 +809,7 @@ def main() -> None:
             </div>
             """, unsafe_allow_html=True)
 
-        with tab4:
+        with tab5:
             st.markdown("### Raw Structured Response & Inspection")
             st.json(results)
 

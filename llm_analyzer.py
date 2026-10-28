@@ -66,6 +66,70 @@ def analyze_resume(resume_text: str, job_description: str) -> dict:
     return _parse_json_response(raw_text)
 
 
+# ── Full 1-Click Tailored Resume Generator ─────────────────────────────────────
+def generate_tailored_resume(resume_text: str, job_description: str, missing_keywords: list = None) -> str:
+    """
+    Generate a complete, end-to-end tailored resume by applying recommended changes
+    (incorporating missing keywords, role-aligned summary, and quantified bullets)
+    while preserving original candidate facts, dates, and education.
+    """
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
+        raise RuntimeError("GROQ_API_KEY not found.")
+
+    client = Groq(api_key=api_key)
+    missing_str = ", ".join(missing_keywords) if missing_keywords else "None"
+
+    prompt = f"""You are an executive resume writer and ATS specialist.
+Rewrite and tailor the candidate's full resume so it achieves top ATS match for the target job description.
+
+═══════════════════════════════════════
+ORIGINAL RESUME:
+═══════════════════════════════════════
+{resume_text}
+
+═══════════════════════════════════════
+TARGET JOB DESCRIPTION:
+═══════════════════════════════════════
+{job_description}
+
+═══════════════════════════════════════
+MISSING KEYWORDS TO INTEGRATE:
+═══════════════════════════════════════
+{missing_str}
+
+═══════════════════════════════════════
+INSTRUCTIONS FOR COMPLETE TAILORED RESUME:
+═══════════════════════════════════════
+1. Retain the candidate's actual name, contact info, companies, degrees, dates, and core career facts. Do NOT invent fake employers or fake degrees.
+2. Professional Summary: Write a compelling 3-4 sentence opening targeting this specific role.
+3. Skills: Group into clear categories (e.g. Technical Skills, Tools & Frameworks, Core Competencies) and seamlessly incorporate the missing keywords that match the role.
+4. Experience: Rewrite existing bullet points into high-impact, quantified achievement statements starting with strong action verbs (Accomplished [X] as measured by [Y], by doing [Z]).
+5. Structure: Use standard, clean ATS-friendly markdown sections:
+   - CANDIDATE NAME & CONTACT
+   - PROFESSIONAL SUMMARY
+   - TECHNICAL SKILLS & COMPETENCIES
+   - PROFESSIONAL EXPERIENCE
+   - EDUCATION & CERTIFICATIONS
+6. Output the COMPLETE tailored resume in clean markdown text. Do not truncate. No conversational preamble, just the resume content.
+"""
+
+    try:
+        response = client.chat.completions.create(
+            model=MODEL_ID,
+            messages=[
+                {"role": "system", "content": "You are a world-class ATS resume architect. Return the complete polished resume text only."},
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0.2,
+            max_tokens=4096,
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as exc:
+        raise RuntimeError(f"Failed to generate tailored resume: {exc}") from exc
+
+
+
 # ── Prompt builder ────────────────────────────────────────────────────────────
 def _build_user_prompt(resume_text: str, job_description: str) -> str:
     return f"""
