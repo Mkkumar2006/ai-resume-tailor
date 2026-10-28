@@ -1,7 +1,10 @@
 """
-app.py  ─  AI Resume Tailor & ATS Optimizer
-─────────────────────────────────────────────
-Professional ATS resume matcher and tailoring tool.
+app.py  ─  AI Resume Tailor & ATS Score Optimizer
+──────────────────────────────────────────────────
+Main Streamlit application entry point.
+
+Run with:
+    streamlit run app.py
 """
 
 import os
@@ -10,7 +13,7 @@ from dotenv import load_dotenv
 from pdf_extractor import extract_text_from_pdf, word_count
 from llm_analyzer import analyze_resume
 
-# ── Env & configuration ───────────────────────────────────────────────────────
+# ── Env & page config ─────────────────────────────────────────────────────────
 load_dotenv()
 try:
     if hasattr(st, "secrets") and "GROQ_API_KEY" in st.secrets:
@@ -19,421 +22,520 @@ except Exception:
     pass
 
 st.set_page_config(
-    page_title="Resume Matcher & ATS Advisor",
-    page_icon="📄",
+    page_title="AI Resume Tailor & ATS Optimizer",
+    page_icon="document",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# ── Sleek Minimalist Studio Styling (Linear / Raycast aesthetic) ──────────────
+# ── Custom CSS: Modern Glassmorphism & Glow (Clean, No-Emoji Aesthetic) ───────
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+/* ── Google Font ── */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
+/* ── Design Tokens ── */
 :root {
-    --bg-page:        #0b0e14;
-    --bg-card:        #121720;
-    --bg-card-subtle: #171e2b;
-    --border-subtle:  #1e293b;
-    --border-hover:   #334155;
-    --text-primary:   #f1f5f9;
-    --text-secondary: #94a3b8;
-    --text-muted:     #64748b;
-    --accent-primary: #3b82f6;
+    --bg-base:        #090d16;
+    --bg-surface:     rgba(17, 24, 39, 0.75);
+    --bg-surface-alt: rgba(30, 41, 59, 0.55);
+    --border-glass:   rgba(255, 255, 255, 0.09);
+    --border-hover:   rgba(99, 102, 241, 0.45);
+    --accent-indigo:  #6366f1;
+    --accent-purple:  #a855f7;
+    --accent-cyan:    #06b6d4;
     --accent-emerald: #10b981;
     --accent-amber:   #f59e0b;
-    --accent-rose:    #ef4444;
+    --accent-rose:    #f43f5e;
+    --text-main:      #f8fafc;
+    --text-sub:       #94a3b8;
+    --text-dim:       #64748b;
+    --radius-lg:      18px;
+    --radius-md:      12px;
     --radius-sm:      6px;
-    --radius-md:      10px;
-    --radius-lg:      14px;
+    --shadow-glow:    0 0 35px rgba(99, 102, 241, 0.18);
+    --shadow-card:    0 12px 36px -8px rgba(0, 0, 0, 0.6);
 }
 
+/* ── Global Styles ── */
 html, body, [class*="css"] {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
-    background-color: var(--bg-page) !important;
-    color: var(--text-primary) !important;
-    letter-spacing: -0.011em;
+    font-family: 'Plus Jakarta Sans', -apple-system, sans-serif !important;
+    background-color: var(--bg-base) !important;
+    color: var(--text-main) !important;
 }
 
 /* ── Scrollbars ── */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: var(--bg-page); }
-::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 99px; }
-::-webkit-scrollbar-thumb:hover { background: #334155; }
+::-webkit-scrollbar { width: 7px; height: 7px; }
+::-webkit-scrollbar-track { background: var(--bg-base); }
+::-webkit-scrollbar-thumb { background: rgba(99, 102, 241, 0.4); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: var(--accent-indigo); }
 
-/* ── Streamlit layout adjustments ── */
-.stApp { background: var(--bg-page) !important; }
+/* ── Streamlit Containers ── */
+.stApp {
+    background: radial-gradient(ellipse at 15% 10%, rgba(99, 102, 241, 0.08) 0%, transparent 45%),
+                radial-gradient(ellipse at 85% 90%, rgba(168, 85, 247, 0.08) 0%, transparent 45%),
+                var(--bg-base) !important;
+}
 .block-container {
     padding: 2.2rem 3rem 4rem 3rem !important;
-    max-width: 1240px;
+    max-width: 1280px;
 }
 
-/* ── Minimalist Studio Header ── */
-.studio-header {
-    margin-bottom: 2.2rem;
-    padding-bottom: 1.4rem;
-    border-bottom: 1px solid var(--border-subtle);
-}
-.studio-kicker {
-    font-size: 0.8rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--accent-primary);
-    margin-bottom: 0.5rem;
-}
-.studio-title {
-    font-size: 1.95rem;
-    font-weight: 700;
-    letter-spacing: -0.03em;
-    color: #f8fafc;
-    margin: 0 0 0.4rem 0;
-}
-.studio-description {
-    font-size: 0.95rem;
-    color: var(--text-secondary);
-    line-height: 1.5;
-    margin: 0;
-    max-width: 720px;
-}
-
-/* ── Panels & Cards ── */
-.studio-card {
-    background: var(--bg-card);
-    border: 1px solid var(--border-subtle);
+/* ── Hero Banner ── */
+.hero-wrapper {
+    position: relative;
+    background: linear-gradient(135deg, rgba(30, 27, 75, 0.4) 0%, rgba(15, 23, 42, 0.7) 60%, rgba(30, 41, 59, 0.3) 100%);
+    border: 1px solid var(--border-glass);
     border-radius: var(--radius-lg);
-    padding: 1.5rem;
-    margin-bottom: 1.25rem;
-    transition: border-color 0.15s ease;
+    padding: 2.6rem 3rem;
+    margin-bottom: 2rem;
+    overflow: hidden;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow: var(--shadow-glow), var(--shadow-card);
 }
-.studio-card:hover {
-    border-color: var(--border-hover);
+.hero-wrapper::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.6), rgba(6, 182, 212, 0.6), transparent);
 }
-.studio-card-title {
-    font-size: 0.82rem;
+.hero-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 5px 14px;
+    background: rgba(99, 102, 241, 0.12);
+    border: 1px solid rgba(99, 102, 241, 0.35);
+    border-radius: 999px;
+    font-size: 0.76rem;
     font-weight: 600;
+    letter-spacing: 0.8px;
+    color: #a5b4fc;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--text-muted);
-    margin-bottom: 1rem;
+    margin-bottom: 0.9rem;
+}
+.hero-title {
+    font-size: 2.5rem;
+    font-weight: 800;
+    letter-spacing: -0.8px;
+    line-height: 1.15;
+    background: linear-gradient(135deg, #ffffff 15%, #c7d2fe 65%, #67e8f9 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin: 0 0 0.65rem 0;
+}
+.hero-subtitle {
+    font-size: 1.02rem;
+    color: var(--text-sub);
+    max-width: 820px;
+    line-height: 1.6;
+    margin: 0;
+}
+
+/* ── Modern Glass Cards ── */
+.glass-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-lg);
+    padding: 1.8rem;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow: var(--shadow-card);
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    height: 100%;
+    margin-bottom: 1.25rem;
+}
+.glass-card:hover {
+    border-color: var(--border-hover);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-glow), var(--shadow-card);
+}
+.card-header {
+    font-size: 0.92rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.75px;
+    color: var(--text-sub);
     display: flex;
     align-items: center;
     justify-content: space-between;
+    margin-bottom: 1.2rem;
+    padding-bottom: 0.6rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-/* ── Minimalist Score Gauge ── */
-.score-container {
+/* ── Step Section Labels ── */
+.step-header {
+    font-size: 0.9rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: #cbd5e1;
+    margin-bottom: 0.65rem;
+}
+
+/* ── Donut Gauge Container ── */
+.score-center-box {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 0.8rem 0;
+    padding: 1rem 0;
 }
-.score-badge {
-    margin-top: 12px;
-    padding: 4px 14px;
+.donut-svg {
+    filter: drop-shadow(0 0 16px rgba(99, 102, 241, 0.25));
+}
+.donut-verdict-badge {
+    margin-top: 14px;
+    padding: 5px 18px;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+}
+
+/* ── Missing Keywords Chips (Clean, No Emojis) ── */
+.tags-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 0.5rem;
+}
+.tag-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 5px 12px;
     border-radius: 999px;
     font-size: 0.8rem;
     font-weight: 600;
-    letter-spacing: 0.02em;
-}
-
-/* ── Keyword Badges ── */
-.tags-list {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 7px;
-    margin-top: 0.4rem;
-}
-.tag-missing {
-    display: inline-flex;
-    align-items: center;
-    padding: 4px 11px;
-    border-radius: var(--radius-sm);
-    font-size: 0.8rem;
-    font-weight: 500;
-    background: rgba(239, 68, 68, 0.08);
-    border: 1px solid rgba(239, 68, 68, 0.28);
-    color: #fca5a5;
+    background: rgba(244, 63, 94, 0.12);
+    border: 1px solid rgba(244, 63, 94, 0.35);
+    color: #fecdd3;
     font-family: 'JetBrains Mono', monospace;
+    transition: all 0.2s ease;
 }
-.tag-complete {
+.tag-badge:hover {
+    background: rgba(244, 63, 94, 0.25);
+    border-color: rgba(244, 63, 94, 0.7);
+    transform: translateY(-1px);
+}
+.tag-badge-green {
     display: inline-flex;
     align-items: center;
-    padding: 6px 12px;
-    border-radius: var(--radius-sm);
+    padding: 6px 14px;
+    border-radius: 999px;
     font-size: 0.82rem;
-    font-weight: 500;
-    background: rgba(16, 185, 129, 0.08);
-    border: 1px solid rgba(16, 185, 129, 0.28);
-    color: #6ee7b7;
-}
-
-/* ── Clean Metric Row ── */
-.metric-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.8rem 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-}
-.metric-row:last-child { border-bottom: none; }
-.metric-label {
-    font-size: 0.85rem;
-    color: var(--text-secondary);
-}
-.metric-val {
-    font-size: 0.95rem;
     font-weight: 600;
-    font-family: 'JetBrains Mono', monospace;
-    color: #f1f5f9;
+    background: rgba(16, 185, 129, 0.12);
+    border: 1px solid rgba(16, 185, 129, 0.35);
+    color: #a7f3d0;
 }
 
-/* ── Content Blocks ── */
-.content-preview {
-    background: var(--bg-card-subtle);
-    border: 1px solid var(--border-subtle);
+/* ── Stats Metric Cards ── */
+.stat-item {
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.06);
     border-radius: var(--radius-md);
-    padding: 1.2rem 1.4rem;
-    font-size: 0.92rem;
-    line-height: 1.7;
-    color: #e2e8f0;
+    padding: 1rem 1.2rem;
+    margin-bottom: 0.8rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
 }
-.bullet-item {
-    background: var(--bg-card);
-    border: 1px solid var(--border-subtle);
+.stat-title {
+    font-size: 0.85rem;
+    color: var(--text-sub);
+    font-weight: 500;
+}
+.stat-val {
+    font-size: 1.2rem;
+    font-weight: 800;
+    color: #38bdf8;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+/* ── Summary & Suggestions ── */
+.content-box {
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(99, 102, 241, 0.25);
+    border-radius: var(--radius-md);
+    padding: 1.4rem 1.6rem;
+    font-size: 0.96rem;
+    line-height: 1.75;
+    color: #e2e8f0;
+    position: relative;
+    border-left: 4px solid var(--accent-indigo);
+}
+.bullet-card {
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(16, 185, 129, 0.25);
+    border-left: 4px solid var(--accent-emerald);
+    border-radius: var(--radius-md);
+    padding: 1.1rem 1.4rem;
+    margin-bottom: 0.9rem;
+    font-size: 0.93rem;
+    line-height: 1.65;
+    color: #f1f5f9;
+    transition: all 0.2s ease;
+}
+.bullet-card:hover {
+    border-left-color: var(--accent-cyan);
+    transform: translateX(4px);
+    background: rgba(15, 23, 42, 0.85);
+}
+
+/* ── Action Checklist ── */
+.checklist-item {
+    background: rgba(15, 23, 42, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.06);
     border-radius: var(--radius-md);
     padding: 0.95rem 1.2rem;
     margin-bottom: 0.75rem;
-    font-size: 0.89rem;
-    line-height: 1.6;
-    color: #f1f5f9;
-    border-left: 3px solid var(--border-hover);
-    transition: border-color 0.15s ease;
-}
-.bullet-item:hover {
-    border-left-color: var(--accent-primary);
-}
-
-/* ── Step-by-Step Checklist ── */
-.task-row {
     display: flex;
     align-items: flex-start;
-    gap: 12px;
-    padding: 0.85rem 1rem;
-    background: var(--bg-card);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-md);
-    margin-bottom: 0.6rem;
-    font-size: 0.88rem;
-    line-height: 1.5;
-    color: var(--text-secondary);
+    gap: 14px;
+    font-size: 0.9rem;
+    color: #cbd5e1;
+    line-height: 1.55;
 }
-.task-index {
-    font-size: 0.75rem;
-    font-weight: 700;
+.step-num {
+    background: rgba(99, 102, 241, 0.2);
+    border: 1px solid rgba(99, 102, 241, 0.4);
+    color: #c7d2fe;
     font-family: 'JetBrains Mono', monospace;
-    background: rgba(255, 255, 255, 0.06);
-    color: var(--text-primary);
-    padding: 2px 7px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    padding: 3px 8px;
     border-radius: var(--radius-sm);
     margin-top: 1px;
 }
 
-/* ── Inputs & Button ── */
-[data-testid="stFileUploader"] {
-    background: var(--bg-card) !important;
-    border: 1px dashed var(--border-hover) !important;
-    border-radius: var(--radius-lg) !important;
-    padding: 1.2rem !important;
-}
-textarea, .stTextArea textarea {
-    background: var(--bg-card) !important;
-    border: 1px solid var(--border-subtle) !important;
-    border-radius: var(--radius-md) !important;
-    color: var(--text-primary) !important;
-    font-size: 0.88rem !important;
-    line-height: 1.5 !important;
-}
-textarea:focus {
-    border-color: var(--accent-primary) !important;
-}
-
-/* ── Buttons (Linear-style clean solid action) ── */
+/* ── Primary CTA Button ── */
 .stButton > button {
-    background: #2563eb !important;
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #d946ef 100%) !important;
     color: #ffffff !important;
-    font-weight: 600 !important;
-    font-size: 0.95rem !important;
-    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    font-weight: 700 !important;
+    font-size: 1.05rem !important;
+    letter-spacing: 0.3px !important;
+    border: none !important;
     border-radius: var(--radius-md) !important;
-    padding: 0.7rem 1.8rem !important;
-    letter-spacing: -0.01em !important;
-    box-shadow: none !important;
-    transition: background-color 0.15s ease !important;
+    padding: 0.85rem 2rem !important;
+    box-shadow: 0 4px 25px rgba(99, 102, 241, 0.4) !important;
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
 }
 .stButton > button:hover {
-    background: #1d4ed8 !important;
+    opacity: 0.95 !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 8px 35px rgba(99, 102, 241, 0.6) !important;
 }
 
-/* ── Download Button ── */
+/* ── Download Button Styling ── */
 .stDownloadButton > button {
-    background: #1e293b !important;
-    color: #f1f5f9 !important;
-    font-weight: 500 !important;
-    font-size: 0.88rem !important;
-    border: 1px solid var(--border-hover) !important;
+    background: linear-gradient(135deg, #059669 0%, #10b981 100%) !important;
+    color: #ffffff !important;
+    font-weight: 700 !important;
+    border: none !important;
     border-radius: var(--radius-md) !important;
-    padding: 0.55rem 1.2rem !important;
-    box-shadow: none !important;
-    transition: background-color 0.15s ease !important;
+    padding: 0.75rem 1.8rem !important;
+    box-shadow: 0 4px 20px rgba(16, 185, 129, 0.35) !important;
+    transition: all 0.2s ease !important;
 }
 .stDownloadButton > button:hover {
-    background: #334155 !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 8px 25px rgba(16, 185, 129, 0.5) !important;
 }
 
-/* ── Tabs (Clean minimal underlines) ── */
+/* ── Input Styling ── */
+[data-testid="stFileUploader"] {
+    background: var(--bg-surface) !important;
+    border: 2px dashed rgba(99, 102, 241, 0.35) !important;
+    border-radius: var(--radius-lg) !important;
+    padding: 1.2rem !important;
+    transition: border-color 0.2s ease;
+}
+[data-testid="stFileUploader"]:hover {
+    border-color: var(--accent-indigo) !important;
+}
+textarea, .stTextArea textarea {
+    background: var(--bg-surface) !important;
+    border: 1px solid var(--border-glass) !important;
+    border-radius: var(--radius-md) !important;
+    color: var(--text-main) !important;
+    font-family: 'Plus Jakarta Sans', sans-serif !important;
+    font-size: 0.9rem !important;
+    transition: border-color 0.2s ease;
+}
+textarea:focus {
+    border-color: var(--accent-indigo) !important;
+    box-shadow: 0 0 15px rgba(99, 102, 241, 0.25) !important;
+}
+
+/* ── Tabs Styling ── */
 .stTabs [data-baseweb="tab-list"] {
-    gap: 16px;
+    gap: 10px;
     background-color: transparent;
-    border-bottom: 1px solid var(--border-subtle);
-    padding-bottom: 0;
+    border-bottom: 1px solid var(--border-glass);
+    padding-bottom: 4px;
 }
 .stTabs [data-baseweb="tab"] {
-    background: transparent;
-    border: none;
-    color: var(--text-muted);
-    font-size: 0.9rem;
-    font-weight: 500;
-    padding: 10px 4px;
-    border-bottom: 2px solid transparent;
+    background: rgba(30, 41, 59, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 10px 10px 0 0;
+    color: var(--text-sub);
+    font-weight: 600;
+    padding: 10px 20px;
+    transition: all 0.2s;
 }
 .stTabs [aria-selected="true"] {
-    background: transparent !important;
-    border-bottom: 2px solid var(--accent-primary) !important;
-    color: #f8fafc !important;
-    font-weight: 600 !important;
+    background: rgba(99, 102, 241, 0.2) !important;
+    border-color: var(--accent-indigo) !important;
+    color: #ffffff !important;
 }
+
+/* ── Divider ── */
+hr { border-color: rgba(255, 255, 255, 0.08) !important; }
 </style>
 """, unsafe_allow_html=True)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Helpers & Minimalist Gauge
+# Circular Gauge & UI Helpers (Clean, No Emojis)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def get_score_meta(score: int) -> dict:
-    """Return styling and verdict for a given score."""
+    """Return color palette, grade, and verdict text for a given ATS score."""
     if score >= 80:
         return {
-            "verdict": "Strong Match",
-            "stroke": "#10b981",
-            "badge_bg": "rgba(16, 185, 129, 0.1)",
-            "badge_border": "rgba(16, 185, 129, 0.3)",
+            "verdict": "Top Match Candidate",
+            "grade": "EXCELLENT",
+            "c1": "#10b981",
+            "c2": "#06b6d4",
+            "badge_bg": "rgba(16, 185, 129, 0.15)",
+            "badge_border": "rgba(16, 185, 129, 0.45)",
             "badge_color": "#6ee7b7",
         }
     elif score >= 60:
         return {
-            "verdict": "Moderate Match",
-            "stroke": "#3b82f6",
-            "badge_bg": "rgba(59, 130, 246, 0.1)",
-            "badge_border": "rgba(59, 130, 246, 0.3)",
-            "badge_color": "#93c5fd",
+            "verdict": "Strong Compatibility",
+            "grade": "GOOD MATCH",
+            "c1": "#06b6d4",
+            "c2": "#6366f1",
+            "badge_bg": "rgba(6, 182, 212, 0.15)",
+            "badge_border": "rgba(6, 182, 212, 0.45)",
+            "badge_color": "#67e8f9",
         }
     elif score >= 40:
         return {
-            "verdict": "Needs Revision",
-            "stroke": "#f59e0b",
-            "badge_bg": "rgba(245, 158, 11, 0.1)",
-            "badge_border": "rgba(245, 158, 11, 0.3)",
+            "verdict": "Moderate Keyword Gap",
+            "grade": "NEEDS WORK",
+            "c1": "#f59e0b",
+            "c2": "#ea580c",
+            "badge_bg": "rgba(245, 158, 11, 0.15)",
+            "badge_border": "rgba(245, 158, 11, 0.45)",
             "badge_color": "#fcd34d",
         }
     else:
         return {
-            "verdict": "Low Alignment",
-            "stroke": "#ef4444",
-            "badge_bg": "rgba(239, 68, 68, 0.1)",
-            "badge_border": "rgba(239, 68, 68, 0.3)",
-            "badge_color": "#fca5a5",
+            "verdict": "Critical Keywords Missing",
+            "grade": "LOW MATCH",
+            "c1": "#f43f5e",
+            "c2": "#e11d48",
+            "badge_bg": "rgba(244, 63, 94, 0.2)",
+            "badge_border": "rgba(244, 63, 94, 0.5)",
+            "badge_color": "#fda4af",
         }
 
 
-def render_minimal_gauge(score: int) -> None:
-    """Renders a clean, refined SVG circular meter without aggressive neon glow."""
+def render_circular_gauge(score: int) -> None:
+    """Renders a smooth, glowing SVG donut gauge representing the ATS score."""
     meta = get_score_meta(score)
-    circumference = 376.99  # 2 * pi * 60
+    circumference = 439.82  # 2 * pi * 70
     safe_score = max(0, min(100, score))
     offset = circumference * (1 - (safe_score / 100))
 
-    html = f"""
-    <div class="score-container">
-        <svg width="150" height="150" viewBox="0 0 150 150">
-            <!-- Background track -->
-            <circle cx="75" cy="75" r="60" 
-                    stroke="rgba(255, 255, 255, 0.07)" 
-                    stroke-width="8" 
+    donut_html = f"""
+    <div class="score-center-box">
+        <svg width="200" height="200" viewBox="0 0 200 200" class="donut-svg">
+            <defs>
+                <linearGradient id="scoreGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="{meta['c1']}"/>
+                    <stop offset="100%" stop-color="{meta['c2']}"/>
+                </linearGradient>
+                <filter id="scoreGlow" x="-20%" y="-20%" width="140%" height="140%">
+                    <feGaussianBlur stdDeviation="5" result="blur" />
+                    <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                </filter>
+            </defs>
+            <!-- Background ring -->
+            <circle cx="100" cy="100" r="70" 
+                    stroke="rgba(255,255,255,0.06)" 
+                    stroke-width="12" 
                     fill="none" />
-            <!-- Progress track -->
-            <circle cx="75" cy="75" r="60" 
-                    stroke="{meta['stroke']}" 
-                    stroke-width="8" 
+            <!-- Progress ring -->
+            <circle cx="100" cy="100" r="70" 
+                    stroke="url(#scoreGrad)" 
+                    stroke-width="12" 
                     stroke-dasharray="{circumference}" 
                     stroke-dashoffset="{offset:.2f}" 
                     stroke-linecap="round" 
                     fill="none" 
-                    transform="rotate(-90 75 75)" />
-            <!-- Centered value -->
-            <text x="75" y="73" text-anchor="middle" font-family="'Inter', sans-serif" 
-                  font-size="36" font-weight="700" fill="#f8fafc" letter-spacing="-1px">{safe_score}</text>
-            <text x="75" y="94" text-anchor="middle" font-family="'Inter', sans-serif" 
-                  font-size="11" font-weight="500" fill="#64748b" letter-spacing="0.5px">OF 100</text>
+                    transform="rotate(-90 100 100)" 
+                    filter="url(#scoreGlow)" />
+            <!-- Center score text -->
+            <text x="100" y="96" text-anchor="middle" font-family="'Plus Jakarta Sans', sans-serif" 
+                  font-size="46" font-weight="800" fill="#ffffff" letter-spacing="-1px">{safe_score}</text>
+            <text x="100" y="122" text-anchor="middle" font-family="'Plus Jakarta Sans', sans-serif" 
+                  font-size="12" font-weight="600" fill="#94a3b8" letter-spacing="1.5px">OUT OF 100</text>
         </svg>
-        <div class="score-badge" style="background:{meta['badge_bg']}; border:1px solid {meta['badge_border']}; color:{meta['badge_color']};">
+        <div class="donut-verdict-badge" style="background:{meta['badge_bg']}; border:1px solid {meta['badge_border']}; color:{meta['badge_color']};">
             {meta['verdict']}
         </div>
     </div>
     """
-    st.markdown(html, unsafe_allow_html=True)
+    st.markdown(donut_html, unsafe_allow_html=True)
 
 
-def build_markdown_report(results: dict, resume_len: int, jd_len: int) -> str:
-    """Generates clean exportable markdown text."""
+def generate_export_report(results: dict, resume_len: int, jd_len: int) -> str:
+    """Compile the full analysis into a clean markdown document for download."""
     score = results.get("match_score", 0)
     meta = get_score_meta(score)
     missing = results.get("missing_keywords", [])
     bullets = results.get("bullet_point_suggestions", [])
     summary = results.get("profile_summary", "")
 
-    missing_str = "\n".join([f"- [ ] {kw}" for kw in missing]) if missing else "None"
-    bullets_str = "\n".join([f"- {b}" for b in bullets]) if bullets else "N/A"
+    missing_md = "\n".join([f"- [ ] {kw}" for kw in missing]) if missing else "None — complete keyword coverage."
+    bullets_md = "\n".join([f"- {b}" for b in bullets]) if bullets else "N/A"
 
-    return f"""# Resume Match & Optimization Report
+    return f"""# AI Resume Tailor & ATS Optimization Report
 
-**ATS Match Score:** {score} / 100 ({meta['verdict']})  
-**Resume Length:** {resume_len} words  
-**Job Description Length:** {jd_len} words  
-
----
-
-## Missing Keywords ({len(missing)})
-{missing_str}
+**ATS Match Score:** {score} / 100 ({meta['grade']} — {meta['verdict']})  
+**Resume Word Count:** {resume_len} words  
+**Target Job Description:** {jd_len} words  
 
 ---
 
-## Recommended Professional Summary
+## Missing Keywords & Skill Gaps ({len(missing)} detected)
+The following terms were identified in the Job Description but are missing or under-emphasized in the resume:
+
+{missing_md}
+
+---
+
+## Tailored Professional Summary
 "{summary}"
 
 ---
 
-## Suggested Bullet Points
-{bullets_str}
+## High-Impact Bullet Points
+{bullets_md}
 
 ---
 
-## Next Steps
-1. Add the missing skills into your Work Experience and Skills sections naturally.
-2. Replace generic descriptions with the action-oriented bullet points above.
-3. Save as a standard single-column PDF before submitting.
+## Recommended Action Plan
+1. Keyword Integration: Add the missing keywords above into the Skills and Work Experience sections.
+2. Impact Framing: Use quantified metrics (percentages, numbers, efficiency metrics).
+3. Final Check: Re-run the analyzer after updates to confirm your match score reaches 80%+.
 """
 
 
@@ -442,64 +544,66 @@ def build_markdown_report(results: dict, resume_len: int, jd_len: int) -> str:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def main() -> None:
-    # ── Header ────────────────────────────────────────────────────────────────
+    # ── Top Hero Banner ───────────────────────────────────────────────────────
     st.markdown("""
-    <div class="studio-header">
-        <div class="studio-kicker">Resume Optimization Studio</div>
-        <h1 class="studio-title">Resume Matcher &amp; ATS Advisor</h1>
-        <p class="studio-description">
-            Compare your resume against a target job description. Identify keyword gaps,
-            check ATS compatibility, and review tailored phrasing for your application.
+    <div class="hero-wrapper">
+        <div class="hero-pill">Groq High-Speed Inference Engine</div>
+        <h1 class="hero-title">AI Resume Tailor &amp; ATS Optimizer</h1>
+        <p class="hero-subtitle">
+            Benchmark your resume against any job description. Get real-time ATS scoring,
+            uncover missing keyword gaps, and receive tailored bullet points calibrated for automated screening.
         </p>
     </div>
     """, unsafe_allow_html=True)
 
-    # ── Two-Column Inputs ─────────────────────────────────────────────────────
-    col1, col2 = st.columns([1, 1], gap="large")
+    # ── Input Columns ─────────────────────────────────────────────────────────
+    col_left, col_right = st.columns([1, 1], gap="large")
 
-    with col1:
-        st.markdown('<div style="font-size:0.88rem; font-weight:600; margin-bottom:0.4rem; color:#cbd5e1;">Resume (PDF)</div>', unsafe_allow_html=True)
+    with col_left:
+        st.markdown('<div class="step-header">Step 1: Upload Resume (PDF)</div>', unsafe_allow_html=True)
         uploaded_file = st.file_uploader(
-            label="Upload your resume PDF",
+            label="Upload your PDF resume",
             type=["pdf"],
             label_visibility="collapsed",
+            help="Upload your existing resume in PDF format"
         )
         if uploaded_file:
             st.markdown(f"""
-            <div style="font-size:0.83rem; color:#94a3b8; margin-top:0.5rem;">
-                Uploaded: <strong>{uploaded_file.name}</strong> ({uploaded_file.size / 1024:.1f} KB)
+            <div style="background:rgba(99, 102, 241, 0.1); border:1px solid rgba(99, 102, 241, 0.3); border-radius:10px; padding:0.8rem 1.2rem; margin-top:0.75rem; font-size:0.88rem; color:#cbd5e1;">
+                <strong>{uploaded_file.name}</strong> &nbsp;·&nbsp; {uploaded_file.size / 1024:.1f} KB &nbsp;·&nbsp; <span style="color:#10b981;">Ready to parse</span>
             </div>
             """, unsafe_allow_html=True)
 
-    with col2:
-        st.markdown('<div style="font-size:0.88rem; font-weight:600; margin-bottom:0.4rem; color:#cbd5e1;">Target Job Description</div>', unsafe_allow_html=True)
+    with col_right:
+        st.markdown('<div class="step-header">Step 2: Target Job Description</div>', unsafe_allow_html=True)
         job_description = st.text_area(
-            label="Job description",
-            placeholder="Paste the job description, required qualifications, and responsibilities here...",
-            height=160,
+            label="Job description text",
+            placeholder="Paste the full job description (responsibilities, required qualifications, tech stack)...",
+            height=180,
             label_visibility="collapsed",
         )
         if job_description:
-            st.caption(f"{len(job_description.split())} words")
+            wc = len(job_description.split())
+            st.caption(f"{wc} words detected · Tip: Include both required and preferred qualifications.")
 
-    # ── Action Button ─────────────────────────────────────────────────────────
+    # ── Analyze Action Button ─────────────────────────────────────────────────
     st.markdown("<br>", unsafe_allow_html=True)
-    b_col = st.columns([1, 2, 1])[1]
-    with b_col:
-        analyze_clicked = st.button("Analyze Match", use_container_width=True)
+    btn_col = st.columns([1, 2, 1])[1]
+    with btn_col:
+        analyze_clicked = st.button("Run ATS Analysis & Tailoring", use_container_width=True)
 
-    st.markdown("<hr style='border-color:#1e293b; margin: 2rem 0;'>", unsafe_allow_html=True)
+    st.markdown("<hr>", unsafe_allow_html=True)
 
-    # ── Results Flow ──────────────────────────────────────────────────────────
+    # ── Analysis & Results View ───────────────────────────────────────────────
     if analyze_clicked:
         if not uploaded_file:
-            st.warning("Please upload a resume in PDF format.")
+            st.error("Please upload your resume PDF before analyzing.")
             st.stop()
         if not job_description.strip():
-            st.warning("Please paste a job description to compare against.")
+            st.error("Please paste a job description before analyzing.")
             st.stop()
         if not os.getenv("GROQ_API_KEY"):
-            st.error("API key not found. Ensure GROQ_API_KEY is configured in your environment or secrets.")
+            st.error("GROQ_API_KEY not set. Check your .env file or Streamlit secrets.")
             st.stop()
 
         with st.spinner("Extracting resume text..."):
@@ -507,14 +611,14 @@ def main() -> None:
                 uploaded_file.seek(0)
                 resume_text = extract_text_from_pdf(uploaded_file)
             except Exception as e:
-                st.error(f"Error parsing PDF: {e}")
+                st.error(f"Error reading PDF: {e}")
                 st.stop()
 
-        with st.spinner("Analyzing keyword coverage and role alignment..."):
+        with st.spinner("Analyzing keyword overlap, qualification match, and crafting suggestions..."):
             try:
                 results = analyze_resume(resume_text, job_description)
             except Exception as e:
-                st.error(f"Analysis error: {e}")
+                st.error(f"Analysis Error: {e}")
                 st.stop()
 
         resume_wc = word_count(resume_text)
@@ -522,149 +626,173 @@ def main() -> None:
         missing = results.get("missing_keywords", [])
         score = results.get("match_score", 0)
 
-        # ── Results Header with Export ────────────────────────────────────────
-        r_head_col1, r_head_col2 = st.columns([3, 1])
-        with r_head_col1:
-            st.markdown("### Analysis Results")
-        with r_head_col2:
-            report_md = build_markdown_report(results, resume_wc, jd_wc)
+        # ── Results Header with Export Action ──────────────────────────────────
+        top_res_col1, top_res_col2 = st.columns([2, 1])
+        with top_res_col1:
+            st.markdown("## Optimization Results")
+        with top_res_col2:
+            report_markdown = generate_export_report(results, resume_wc, jd_wc)
             st.download_button(
-                label="Export Report (.md)",
-                data=report_md,
-                file_name="resume_optimization_report.md",
+                label="Download Full Report (.md)",
+                data=report_markdown,
+                file_name="ATS_Resume_Optimization_Report.md",
                 mime="text/markdown",
                 use_container_width=True,
             )
 
-        # ── Tabbed View ───────────────────────────────────────────────────────
+        # ── Tabbed Interface ──────────────────────────────────────────────────
         tab1, tab2, tab3, tab4 = st.tabs([
-            "Overview",
-            "Suggested Content",
-            "Action Plan",
-            "Raw Data"
+            "ATS Score & Overview",
+            "Tailored Content",
+            "Action Checklist",
+            "Raw Data & Insights"
         ])
 
         with tab1:
-            r1, r2, r3 = st.columns([1.1, 1.4, 0.9], gap="medium")
+            r1, r2, r3 = st.columns([1.1, 1.3, 0.9], gap="large")
 
-            # Column 1: Score Gauge
+            # Column 1: Donut Gauge
             with r1:
-                st.markdown('<div class="studio-card">', unsafe_allow_html=True)
-                st.markdown('<div class="studio-card-title">ATS Match Score</div>', unsafe_allow_html=True)
-                render_minimal_gauge(score)
+                st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+                st.markdown('<div class="card-header"><span>Match Score</span></div>', unsafe_allow_html=True)
+                render_circular_gauge(score)
                 st.markdown('</div>', unsafe_allow_html=True)
 
-            # Column 2: Missing Keywords
+            # Column 2: Missing Keywords Tags
             with r2:
-                st.markdown('<div class="studio-card">', unsafe_allow_html=True)
+                st.markdown('<div class="glass-card">', unsafe_allow_html=True)
                 st.markdown(
-                    f'<div class="studio-card-title">Missing Keywords '
-                    f'<span style="color:#f87171;font-weight:500;">({len(missing)} detected)</span></div>',
+                    f'<div class="card-header"><span>Missing Keywords</span>'
+                    f'<span style="color:#f43f5e;font-size:0.85rem;font-weight:700;">'
+                    f'({len(missing)} detected)</span></div>',
                     unsafe_allow_html=True,
                 )
                 if missing:
-                    tags_html = "".join([f'<span class="tag-missing">{kw}</span>' for kw in missing])
-                    st.markdown(f'<div class="tags-list">{tags_html}</div>', unsafe_allow_html=True)
-                    st.markdown("<p style='font-size:0.8rem;color:#64748b;margin-top:0.9rem;'>These terms appear in the job description but were not identified in your resume.</p>", unsafe_allow_html=True)
+                    tags_html = "".join([f'<span class="tag-badge">{kw}</span>' for kw in missing])
+                    st.markdown(f'<div class="tags-wrap">{tags_html}</div>', unsafe_allow_html=True)
+                    st.markdown("<br><p style='font-size:0.82rem;color:#94a3b8;'>Incorporate these exact terms in your skills and bullet points to pass automated screening.</p>", unsafe_allow_html=True)
                 else:
-                    st.markdown('<span class="tag-complete">All key terms from the job description are present.</span>', unsafe_allow_html=True)
+                    st.markdown('<span class="tag-badge-green">No critical keywords missing. Excellent alignment.</span>', unsafe_allow_html=True)
                 st.markdown('</div>', unsafe_allow_html=True)
 
-            # Column 3: Metrics
+            # Column 3: Quick Stats
             with r3:
-                st.markdown('<div class="studio-card">', unsafe_allow_html=True)
-                st.markdown('<div class="studio-card-title">Document Stats</div>', unsafe_allow_html=True)
+                st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+                st.markdown('<div class="card-header"><span>Content Metrics</span></div>', unsafe_allow_html=True)
                 st.markdown(f"""
-                <div class="metric-row">
-                    <span class="metric-label">Resume Words</span>
-                    <span class="metric-val">{resume_wc}</span>
+                <div class="stat-item">
+                    <span class="stat-title">Resume Words</span>
+                    <span class="stat-val">{resume_wc}</span>
                 </div>
-                <div class="metric-row">
-                    <span class="metric-label">JD Words</span>
-                    <span class="metric-val">{jd_wc}</span>
+                <div class="stat-item">
+                    <span class="stat-title">Job Description Words</span>
+                    <span class="stat-val">{jd_wc}</span>
                 </div>
-                <div class="metric-row">
-                    <span class="metric-label">Gaps Identified</span>
-                    <span class="metric-val" style="color:{'#f87171' if missing else '#34d399'};">{len(missing)}</span>
+                <div class="stat-item">
+                    <span class="stat-title">Keyword Gaps</span>
+                    <span class="stat-val" style="color:{'#f43f5e' if missing else '#10b981'};">{len(missing)}</span>
                 </div>
                 """, unsafe_allow_html=True)
                 st.markdown('</div>', unsafe_allow_html=True)
 
         with tab2:
-            st.markdown("#### Tailored Professional Summary")
-            st.markdown(f'<div class="content-preview">"{results["profile_summary"]}"</div>', unsafe_allow_html=True)
-            with st.expander("Copy Summary Text", expanded=False):
+            st.markdown("### Tailored Professional Summary")
+            st.caption("Place this calibrated summary directly beneath your resume header:")
+            st.markdown(f'<div class="content-box">"{results["profile_summary"]}"</div>', unsafe_allow_html=True)
+            with st.expander("Copyable Summary Text", expanded=False):
                 st.code(results["profile_summary"], language="text")
 
             st.markdown("<br>", unsafe_allow_html=True)
-            st.markdown("#### Experience Bullet Point Suggestions")
+            st.markdown("### Tailored Experience Bullet Points")
+            st.caption("Replace generic bullet points in your experience section with these quantified, targeted achievements:")
             for b in results.get("bullet_point_suggestions", []):
-                st.markdown(f'<div class="bullet-item">• &nbsp;{b}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="bullet-card">▸ &nbsp;{b}</div>', unsafe_allow_html=True)
 
         with tab3:
-            st.markdown("#### Recommendations")
+            st.markdown("### Step-by-Step Optimization Roadmap")
+            st.caption("Follow these prioritized steps to elevate your resume compatibility:")
+
             st.markdown(f"""
-            <div class="task-row">
-                <span class="task-index">01</span>
-                <div><strong>Incorporate Keyword Gaps:</strong> Work the {len(missing)} missing keywords naturally into your Skills and relevant project bullets.</div>
+            <div class="checklist-item">
+                <span class="step-num">01</span>
+                <div>
+                    <strong>Inject High-Priority Gaps:</strong> Add the {len(missing)} missing keywords ({', '.join(missing[:3]) if missing else 'specialized skills'}) to your technical skills section and throughout your project descriptions.
+                </div>
             </div>
-            <div class="task-row">
-                <span class="task-index">02</span>
-                <div><strong>Align Professional Summary:</strong> Update the top of your resume with the targeted summary from the Suggested Content tab.</div>
+            <div class="checklist-item">
+                <span class="step-num">02</span>
+                <div>
+                    <strong>Adopt the Tailored Summary:</strong> Replace generic objective statements with the role-calibrated summary provided in the Tailored Content tab.
+                </div>
             </div>
-            <div class="task-row">
-                <span class="task-index">03</span>
-                <div><strong>Quantify Results:</strong> Emphasize measurable business or engineering impact (metrics, percentages, time saved).</div>
+            <div class="checklist-item">
+                <span class="step-num">03</span>
+                <div>
+                    <strong>Action &amp; Metric Formulas:</strong> Rewrite passive bullet points using measurable outcomes (Accomplished [X] as measured by [Y], by doing [Z]).
+                </div>
             </div>
-            <div class="task-row">
-                <span class="task-index">04</span>
-                <div><strong>Formatting Check:</strong> Keep formatting clean, avoiding multi-column tables or text boxes that can confuse ATS parsers.</div>
+            <div class="checklist-item">
+                <span class="step-num">04</span>
+                <div>
+                    <strong>Clean Formatting:</strong> Save your final tailored resume as an ATS-friendly single-column PDF without nested tables or graphic text boxes.
+                </div>
             </div>
             """, unsafe_allow_html=True)
 
         with tab4:
-            st.markdown("#### Structured JSON Response")
+            st.markdown("### Raw Structured Response & Inspection")
             st.json(results)
 
     else:
-        # ── Empty State ────────────────────────────────────────────────────────
+        # ── Empty state ────────────────────────────────────────────────────────
         st.markdown("""
-        <div style="text-align:center; padding: 4rem 2rem; background: var(--bg-card); border: 1px dashed var(--border-hover); border-radius: 12px;">
-            <p style="font-size:1rem; color:#cbd5e1; font-weight:600; margin-bottom:0.4rem;">Upload your resume to begin</p>
-            <p style="font-size:0.88rem; color:#64748b; max-width:480px; margin:0 auto; line-height:1.5;">
-                Add your resume PDF and target job description above, then click <strong>Analyze Match</strong> to view your compatibility score and suggestions.
+        <div style="text-align:center; padding: 4.5rem 2rem; background: rgba(17, 24, 39, 0.4); border: 1px dashed rgba(255, 255, 255, 0.1); border-radius: 20px;">
+            <h3 style="font-size:1.35rem; color:#f8fafc; font-weight:700; margin-bottom:0.5rem;">Ready to Optimize Your Resume</h3>
+            <p style="font-size:0.95rem; color:#94a3b8; max-width:540px; margin:0 auto 1.5rem auto; line-height:1.6;">
+                Upload your resume PDF on the left, paste the target job description on the right, and click
+                <strong>Run ATS Analysis &amp; Tailoring</strong> to view your compatibility score and tailored suggestions.
             </p>
+            <div style="display:flex; justify-content:center; gap:24px; font-size:0.85rem; color:#64748b;">
+                <span>Secure In-Memory Processing</span>
+                <span>·</span>
+                <span>High-Speed Groq Engine</span>
+                <span>·</span>
+                <span>Precision ATS Matching</span>
+            </div>
         </div>
         """, unsafe_allow_html=True)
 
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
-    st.markdown("### System Status")
+    st.markdown("### Engine Status")
     if os.getenv("GROQ_API_KEY"):
-        st.success("API Connected")
+        st.success("Groq LPU Connected")
     else:
-        st.error("GROQ_API_KEY not configured")
+        st.error("GROQ_API_KEY Missing")
+        st.caption("Add your key to .env or Streamlit secrets.")
 
     st.markdown("---")
-    st.markdown("### Scoring Criteria")
+    st.markdown("### ATS Scoring Scale")
     st.markdown("""
-    - **80 – 100:** Strong alignment with core qualifications.
-    - **60 – 79:** Good fit; minor keyword additions recommended.
-    - **40 – 59:** Noticeable skill or domain gaps present.
-    - **0 – 39:** Limited overlap with target position.
+    | Score Range | Status |
+    |---|---|
+    | **80 – 100** | Top Match |
+    | **60 – 79**  | Strong Fit |
+    | **40 – 59**  | Gaps Detected |
+    | **0 – 39**   | Low Alignment |
     """)
 
     st.markdown("---")
-    st.markdown("### Best Practices")
+    st.markdown("### ATS Best Practices")
     st.markdown("""
-    - Use exact industry terms when applicable.
-    - Retain standard resume section titles.
-    - Avoid complex multi-column graphic layouts for ATS screening.
+    - **Exact Phrasing:** Match the specific terms used in the job description.
+    - **Standard Headings:** Use standard labels like *Work Experience*, *Education*, and *Skills*.
+    - **PDF Structure:** Keep PDF layout single-column for optimal parser readability.
     """)
 
     st.markdown("---")
-    st.caption("Resume Matcher & ATS Advisor")
+    st.caption("AI Resume Tailor & ATS Optimizer")
 
 
 if __name__ == "__main__":
