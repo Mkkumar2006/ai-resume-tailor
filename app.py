@@ -13,8 +13,11 @@ from dotenv import load_dotenv
 from pdf_extractor import extract_text_from_pdf, word_count
 import importlib
 import llm_analyzer
+import pdf_generator
 importlib.reload(llm_analyzer)
+importlib.reload(pdf_generator)
 from llm_analyzer import analyze_resume, generate_tailored_resume
+from pdf_generator import generate_resume_pdf, generate_report_pdf
 
 # ── Env & page config ─────────────────────────────────────────────────────────
 load_dotenv()
@@ -641,18 +644,34 @@ def main() -> None:
         score = results.get("match_score", 0)
 
         # ── Results Header with Export Action ──────────────────────────────────
-        top_res_col1, top_res_col2 = st.columns([2, 1])
+        top_res_col1, top_res_col2 = st.columns([1.8, 1.2])
         with top_res_col1:
             st.markdown("## Optimization Results")
         with top_res_col2:
             report_markdown = generate_export_report(results, resume_wc, jd_wc)
-            st.download_button(
-                label="Download Full Report (.md)",
-                data=report_markdown,
-                file_name="ATS_Resume_Optimization_Report.md",
-                mime="text/markdown",
-                use_container_width=True,
-            )
+            try:
+                report_pdf = generate_report_pdf(report_markdown)
+            except Exception:
+                report_pdf = None
+
+            dl_sub1, dl_sub2 = st.columns([1, 1])
+            with dl_sub1:
+                if report_pdf:
+                    st.download_button(
+                        label="Report (PDF)",
+                        data=report_pdf,
+                        file_name="ATS_Optimization_Report.pdf",
+                        mime="application/pdf",
+                        use_container_width=True,
+                    )
+            with dl_sub2:
+                st.download_button(
+                    label="Report (.md)",
+                    data=report_markdown,
+                    file_name="ATS_Optimization_Report.md",
+                    mime="text/markdown",
+                    use_container_width=True,
+                )
 
         # ── Tabbed Interface ──────────────────────────────────────────────────
         tab1, tab2, tab3, tab4, tab5 = st.tabs([
@@ -733,17 +752,32 @@ def main() -> None:
 
                 tailored_content = st.session_state.get("tailored_resume_text", "")
 
-                action_col1, action_col2 = st.columns([1, 1])
+                # Compile PDF from current content
+                try:
+                    resume_pdf_bytes = generate_resume_pdf(tailored_content)
+                except Exception:
+                    resume_pdf_bytes = None
+
+                action_col1, action_col2, action_col3 = st.columns([1.5, 1.2, 1.3])
                 with action_col1:
+                    if resume_pdf_bytes:
+                        st.download_button(
+                            label="Download Resume (PDF)",
+                            data=resume_pdf_bytes,
+                            file_name="Tailored_Resume.pdf",
+                            mime="application/pdf",
+                            use_container_width=True,
+                        )
+                with action_col2:
                     st.download_button(
-                        label="Download Tailored Resume (.md / .txt)",
+                        label="Download Text (.md)",
                         data=tailored_content,
                         file_name="Tailored_Resume.md",
                         mime="text/markdown",
                         use_container_width=True,
                     )
-                with action_col2:
-                    st.caption("You can edit the text directly in the box below before copying or downloading.")
+                with action_col3:
+                    st.caption("You can edit the text directly in the box below before downloading.")
 
                 edited_text = st.text_area(
                     label="Editable Tailored Resume Text",
@@ -751,7 +785,8 @@ def main() -> None:
                     height=460,
                     key="editable_tailored_resume_area"
                 )
-                st.session_state["tailored_resume_text"] = edited_text
+                if edited_text != tailored_content:
+                    st.session_state["tailored_resume_text"] = edited_text
 
                 with st.expander("Copyable Text (1-Click)", expanded=False):
                     st.code(edited_text, language="markdown")
