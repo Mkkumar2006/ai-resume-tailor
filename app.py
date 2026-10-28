@@ -14,7 +14,13 @@ from pdf_extractor import extract_text_from_pdf, word_count
 from llm_analyzer import analyze_resume
 
 # ── Env & page config ─────────────────────────────────────────────────────────
-load_dotenv()  # Load GROQ_API_KEY from .env
+load_dotenv()  # Load GROQ_API_KEY from .env locally
+# Also support Streamlit Community Cloud secrets when deployed
+try:
+    if hasattr(st, "secrets") and "GROQ_API_KEY" in st.secrets:
+        os.environ["GROQ_API_KEY"] = st.secrets["GROQ_API_KEY"]
+except Exception:
+    pass
 
 st.set_page_config(
     page_title="AI Resume Tailor & ATS Optimizer",
