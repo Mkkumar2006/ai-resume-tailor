@@ -11,6 +11,9 @@ import os
 import streamlit as st
 from dotenv import load_dotenv
 from pdf_extractor import extract_text_from_pdf, word_count
+import importlib
+import llm_analyzer
+importlib.reload(llm_analyzer)
 from llm_analyzer import analyze_resume, generate_tailored_resume
 
 # ── Env & page config ─────────────────────────────────────────────────────────
